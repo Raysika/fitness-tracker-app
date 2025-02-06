@@ -11,6 +11,35 @@ void main() async {
   runApp(const MyApp());
 }
 
+//testing database connection
+// class MyApp extends StatelessWidget {
+//   final supabase = Supabase.instance.client;
+
+//   Future<void> testConnection() async {
+//     try {
+//       final response = await supabase.from('test').select();
+//       print('Supabase response: $response');
+//     } catch (e) {
+//       print('Error connecting to Supabase: $e');
+//     }
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return MaterialApp(
+//       home: Scaffold(
+//         appBar: AppBar(title: Text("Supabase Test")),
+//         body: Center(
+//           child: ElevatedButton(
+//             onPressed: testConnection,
+//             child: Text("Test Supabase Connection"),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
