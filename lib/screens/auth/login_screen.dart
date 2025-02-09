@@ -27,6 +27,12 @@ class LoginScreen extends StatelessWidget {
               },
               child: const Text('Login with Google'),
             ),
+            TextButton(
+              onPressed: () {
+                context.go('/signup'); // Navigate to Signup Screen
+              },
+              child: const Text('Don’t have an account? Sign up'),
+            ),
           ],
         ),
       ),
