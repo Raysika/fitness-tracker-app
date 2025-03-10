@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fitness_tracker/routes/routes.dart'; // Import routes.dart
 
 class SignupScreen extends StatelessWidget {
   const SignupScreen({super.key});
@@ -37,7 +38,8 @@ class SignupScreen extends StatelessWidget {
             ),
             TextButton(
               onPressed: () {
-                context.go('/'); // Navigate back to Login
+                // Navigate back to Login Screen
+                context.go(AppRoutes.login); // Use named constant
               },
               child: const Text('Already have an account? Login'),
             ),

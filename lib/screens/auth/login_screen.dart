@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fitness_tracker/routes/routes.dart'; // Import routes.dart
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -21,15 +22,15 @@ class LoginScreen extends StatelessWidget {
             const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
-                // Navigate to Dashboard for now (will implement authentication later)
-                // Use GoRouter's navigation to go to the dashboard
-                context.go('/dashboard');
+                // Navigate to Home Screen
+                context.go(AppRoutes.home); // Use named constant
               },
               child: const Text('Login with Google'),
             ),
             TextButton(
               onPressed: () {
-                context.go('/signup'); // Navigate to Signup Screen
+                // Navigate to Signup Screen
+                context.go(AppRoutes.signup); // Use named constant
               },
               child: const Text('Don’t have an account? Sign up'),
             ),
