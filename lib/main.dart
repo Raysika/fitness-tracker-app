@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fitness_tracker/routes/router.dart';
 import 'package:fitness_tracker/themes/theme.dart';
 
