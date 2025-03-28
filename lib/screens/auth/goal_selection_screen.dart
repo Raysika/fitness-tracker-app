@@ -143,7 +143,7 @@ class _GoalSelectionScreenState extends State<GoalSelectionScreen> {
               padding: const EdgeInsets.all(25),
               child: ElevatedButton(
                 onPressed: () {
-                  context.go(AppRoutes.home);
+                  context.go(AppRoutes.welcome);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: TColor.primaryColor1,
