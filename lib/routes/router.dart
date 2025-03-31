@@ -1,11 +1,11 @@
 import 'package:fitness_tracker/screens/auth/complete_profile_screen.dart';
 import 'package:fitness_tracker/screens/auth/goal_selection_screen.dart';
 import 'package:fitness_tracker/screens/auth/welcome_screen.dart';
+import 'package:fitness_tracker/screens/dashboard/main_tab_view.dart';
 import 'package:fitness_tracker/screens/splash/splash_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fitness_tracker/screens/auth/login_screen.dart';
 import 'package:fitness_tracker/screens/auth/signup_screen.dart';
-import 'package:fitness_tracker/screens/dashboard/home_screen.dart';
 import 'package:fitness_tracker/screens/onboarding/onboarding_screen.dart';
 import 'routes.dart'; // Import the routes.dart file
 
@@ -41,7 +41,7 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: AppRoutes.home, // Use named constant
-      builder: (context, state) => const HomeScreen(),
+      builder: (context, state) => const MainTabView(),
       // {
       //   return const HomeScreen(); // Always navigate to HomeScreen
       //   // final user = Supabase.instance.client.auth.currentUser;
