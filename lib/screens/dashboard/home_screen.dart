@@ -1,4 +1,3 @@
-// lib/screens/dashboard/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:fitness_tracker/common/color_extension.dart';
 import 'package:percent_indicator/percent_indicator.dart';
