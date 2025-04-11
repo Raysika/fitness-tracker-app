@@ -1,4 +1,3 @@
-// lib/screens/dashboard/main_tab_view.dart
 import 'package:fitness_tracker/screens/dashboard/home_screen.dart';
 import 'package:fitness_tracker/screens/dashboard/profile_screen.dart';
 import 'package:fitness_tracker/screens/dashboard/progress_screen.dart';
