@@ -1,4 +1,5 @@
 // lib/screens/dashboard/profile_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:fitness_tracker/common/color_extension.dart';
 import 'package:provider/provider.dart';
@@ -30,14 +31,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final profile = await _supabaseService.getUserProfile();
     if (profile != null) {
       setState(() {
+        // Convert numeric values to proper types
+        double? height = profile['height'] != null
+            ? (profile['height'] is int
+                ? profile['height'].toDouble()
+                : profile['height'])
+            : null;
+
+        double? weight = profile['weight'] != null
+            ? (profile['weight'] is int
+                ? profile['weight'].toDouble()
+                : profile['weight'])
+            : null;
+
         userData = {
           'name':
               '${profile['first_name'] ?? ''} ${profile['last_name'] ?? ''}',
           'email': Supabase.instance.client.auth.currentUser?.email ?? '',
           'goal': profile['fitness_goal'] ?? 'Not set',
-          'height': '${profile['height'] ?? 0} cm',
-          'weight': '${profile['weight'] ?? 0} kg',
-          'bmi': _calculateBMI(profile['height'], profile['weight']),
+          'height': height != null ? '$height cm' : 'Not set',
+          'weight': weight != null ? '$weight kg' : 'Not set',
+          'bmi': _calculateBMI(height, weight),
           'joinDate': 'Joined ${_formatDate(profile['created_at'])}',
         };
         _isLoading = false;
@@ -434,21 +448,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _confirmLogout() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Logout"),
-        content: Text("Are you sure you want to logout?"),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text("Logout"),
+        content: const Text("Are you sure you want to logout?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text("Cancel"),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Cancel"),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              // First get the BuildContext for navigation
+              final router = GoRouter.of(context);
+
+              // Close the dialog first
+              Navigator.pop(dialogContext);
+
+              // Then perform the signout operation
               await context.read<AuthProvider>().signOut();
-              context.go(AppRoutes.login);
+
+              // Navigate to login screen after signout is complete
+              // Use the saved router instead of context.go
+              router.go(AppRoutes.login);
             },
-            child: Text(
+            child: const Text(
               "Logout",
               style: TextStyle(color: Colors.red),
             ),
