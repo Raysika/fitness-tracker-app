@@ -1,5 +1,8 @@
+// lib/screens/auth/welcome_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../common/color_extension.dart';
 import '../../routes/routes.dart';
 import '../../themes/theme.dart';
@@ -28,7 +31,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             children: [
               SizedBox(height: media.width * 0.1),
               Image.asset(
-                "assets/images/welcome.png", // Make sure to add this image
+                "assets/images/welcome.png",
               ),
               SizedBox(height: media.width * 0.1),
               Text(
@@ -50,8 +53,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    context.go(AppRoutes.home);
+                  onPressed: () async {
+                    // Complete signup process
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('is_signing_up', false);
+
+                    if (context.mounted) {
+                      context.go(AppRoutes.home);
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: TColor.primaryColor1,

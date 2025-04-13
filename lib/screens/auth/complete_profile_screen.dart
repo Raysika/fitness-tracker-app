@@ -1,9 +1,11 @@
 // lib/screens/auth/complete_profile_screen.dart
+
 import 'package:fitness_tracker/routes/routes.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../common/color_extension.dart'; // Import TColor
-import '../../themes/theme.dart'; // Import AppTheme
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../common/color_extension.dart';
+import '../../themes/theme.dart';
 import '../../services/supabase_service.dart';
 
 class CompleteProfileScreen extends StatefulWidget {
@@ -22,6 +24,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   String _selectedGender = 'Male';
   final SupabaseService _supabaseService = SupabaseService();
   bool _isLoading = false;
+
   void _submitForm() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -42,7 +45,13 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           height: double.parse(_heightController.text),
         );
 
-        context.go(AppRoutes.goalSelection);
+        // Save profile completion status
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('profile_complete', true);
+
+        if (context.mounted) {
+          context.go(AppRoutes.goalSelection);
+        }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Error: ${e.toString()}")),
@@ -58,12 +67,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: TColor.white, // Use TColor for background color
+      backgroundColor: TColor.white,
       appBar: AppBar(
         title: const Text('Complete Your Profile'),
-        backgroundColor:
-            TColor.primaryColor1, // Use TColor for app bar background
-        foregroundColor: TColor.white, // Use TColor for app bar text color
+        backgroundColor: TColor.primaryColor1,
+        foregroundColor: TColor.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -74,13 +82,13 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
             children: [
               // Add the image at the top
               Image.asset(
-                'assets/images/complete_profile.png', // Path to your image
+                'assets/images/complete_profile.png',
               ),
-              const SizedBox(height: 20), // Add some spacing
+              const SizedBox(height: 20),
               Text(
                 'Step 1 of 3',
                 style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                  color: TColor.gray, // Use TColor for text color
+                  color: TColor.gray,
                 ),
               ),
               const SizedBox(height: 20),
@@ -88,23 +96,17 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 controller: _nameController,
                 decoration: InputDecoration(
                   labelText: 'Full Name',
-                  labelStyle: TextStyle(
-                      color: TColor.black), // Use TColor for label color
+                  labelStyle: TextStyle(color: TColor.black),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: TColor
-                            .primaryColor1), // Use TColor for border color
+                    borderSide: BorderSide(color: TColor.primaryColor1),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: TColor
-                            .primaryColor1), // Use TColor for focused border
+                    borderSide: BorderSide(color: TColor.primaryColor1),
                   ),
                 ),
-                style:
-                    TextStyle(color: TColor.black), // Use TColor for text color
+                style: TextStyle(color: TColor.black),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter your name';
@@ -117,25 +119,18 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 value: _selectedGender,
                 decoration: InputDecoration(
                   labelText: 'Gender',
-                  labelStyle: TextStyle(
-                      color: TColor.black), // Use TColor for label color
+                  labelStyle: TextStyle(color: TColor.black),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: TColor
-                            .primaryColor1), // Use TColor for border color
+                    borderSide: BorderSide(color: TColor.primaryColor1),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: TColor
-                            .primaryColor1), // Use TColor for focused border
+                    borderSide: BorderSide(color: TColor.primaryColor1),
                   ),
                 ),
-                dropdownColor:
-                    TColor.white, // Use TColor for dropdown background
-                style:
-                    TextStyle(color: TColor.black), // Use TColor for text color
+                dropdownColor: TColor.white,
+                style: TextStyle(color: TColor.black),
                 items: ['Male', 'Female', 'Other']
                     .map((gender) => DropdownMenuItem(
                           value: gender,
@@ -153,23 +148,17 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 controller: _dobController,
                 decoration: InputDecoration(
                   labelText: 'Date of Birth',
-                  labelStyle: TextStyle(
-                      color: TColor.black), // Use TColor for label color
+                  labelStyle: TextStyle(color: TColor.black),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: TColor
-                            .primaryColor1), // Use TColor for border color
+                    borderSide: BorderSide(color: TColor.primaryColor1),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: TColor
-                            .primaryColor1), // Use TColor for focused border
+                    borderSide: BorderSide(color: TColor.primaryColor1),
                   ),
                 ),
-                style:
-                    TextStyle(color: TColor.black), // Use TColor for text color
+                style: TextStyle(color: TColor.black),
                 readOnly: true,
                 onTap: () async {
                   final DateTime? pickedDate = await showDatePicker(
@@ -195,23 +184,17 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 controller: _heightController,
                 decoration: InputDecoration(
                   labelText: 'Height (cm)',
-                  labelStyle: TextStyle(
-                      color: TColor.black), // Use TColor for label color
+                  labelStyle: TextStyle(color: TColor.black),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: TColor
-                            .primaryColor1), // Use TColor for border color
+                    borderSide: BorderSide(color: TColor.primaryColor1),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: TColor
-                            .primaryColor1), // Use TColor for focused border
+                    borderSide: BorderSide(color: TColor.primaryColor1),
                   ),
                 ),
-                style:
-                    TextStyle(color: TColor.black), // Use TColor for text color
+                style: TextStyle(color: TColor.black),
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -225,23 +208,17 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 controller: _weightController,
                 decoration: InputDecoration(
                   labelText: 'Weight (kg)',
-                  labelStyle: TextStyle(
-                      color: TColor.black), // Use TColor for label color
+                  labelStyle: TextStyle(color: TColor.black),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: TColor
-                            .primaryColor1), // Use TColor for border color
+                    borderSide: BorderSide(color: TColor.primaryColor1),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color: TColor
-                            .primaryColor1), // Use TColor for focused border
+                    borderSide: BorderSide(color: TColor.primaryColor1),
                   ),
                 ),
-                style:
-                    TextStyle(color: TColor.black), // Use TColor for text color
+                style: TextStyle(color: TColor.black),
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -255,9 +232,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 child: ElevatedButton(
                   onPressed: _submitForm,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        TColor.primaryColor1, // Use TColor for button color
-                    foregroundColor: TColor.white, // Use TColor for text color
+                    backgroundColor: TColor.primaryColor1,
+                    foregroundColor: TColor.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

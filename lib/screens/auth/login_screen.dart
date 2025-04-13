@@ -1,6 +1,8 @@
 // lib/screens/auth/login_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../common/color_extension.dart';
 import '../../routes/routes.dart';
 import '../../themes/theme.dart';
@@ -190,16 +192,26 @@ class _LoginScreenState extends State<LoginScreen> {
                         });
 
                         try {
+                          // Make sure we're not in signup process
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool('is_signing_up', false);
+
                           await _supabaseService.signIn(
                             _emailController.text,
                             _passwordController.text,
                           );
-                          context.go(AppRoutes.home);
+
+                          if (context.mounted) {
+                            context.go(AppRoutes.home);
+                          }
                         } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text("Login failed: ${e.toString()}")),
-                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content:
+                                      Text("Login failed: ${e.toString()}")),
+                            );
+                          }
                         } finally {
                           setState(() {
                             _isLoading = false;

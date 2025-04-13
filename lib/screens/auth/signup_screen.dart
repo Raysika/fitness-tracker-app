@@ -1,5 +1,8 @@
+// lib/screens/auth/signup_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../common/color_extension.dart';
 import '../../routes/routes.dart';
 import '../../services/supabase_service.dart';
@@ -281,17 +284,26 @@ class _SignupScreenState extends State<SignupScreen> {
                         });
 
                         try {
+                          // Mark that we're in the signup process
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool('is_signing_up', true);
+
                           await _supabaseService.signUp(
                             _emailController.text,
                             _passwordController.text,
                             _firstNameController.text,
                             _lastNameController.text,
                           );
-                          context.go(AppRoutes.completeProfile);
+
+                          if (context.mounted) {
+                            context.go(AppRoutes.completeProfile);
+                          }
                         } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("Error: ${e.toString()}")),
-                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("Error: ${e.toString()}")),
+                            );
+                          }
                         } finally {
                           setState(() {
                             _isLoading = false;

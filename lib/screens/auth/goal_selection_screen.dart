@@ -1,6 +1,9 @@
+// lib/screens/auth/goal_selection_screen.dart
+
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../common/color_extension.dart';
 import '../../routes/routes.dart';
 import '../../themes/theme.dart';
@@ -76,7 +79,6 @@ class _GoalSelectionScreenState extends State<GoalSelectionScreen> {
             // Carousel Section
             Expanded(
               child: CarouselSlider(
-                // For v5.0.0, we don't pass controller directly
                 items: goalOptions.map((goal) {
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 10),
@@ -103,8 +105,6 @@ class _GoalSelectionScreenState extends State<GoalSelectionScreen> {
                         children: [
                           Image.asset(
                             goal["image"]!,
-                            // width: media.width * 0.5,
-                            // fit: BoxFit.contain,
                           ),
                           const SizedBox(height: 30),
                           Text(
@@ -162,11 +162,20 @@ class _GoalSelectionScreenState extends State<GoalSelectionScreen> {
                     await _supabaseService.updateUserProfile(
                       fitnessGoal: _selectedGoal,
                     );
-                    context.go(AppRoutes.welcome);
+
+                    // Save goal selection completion in preferences
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('goal_selected', true);
+
+                    if (context.mounted) {
+                      context.go(AppRoutes.welcome);
+                    }
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Error: ${e.toString()}")),
-                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Error: ${e.toString()}")),
+                      );
+                    }
                   } finally {
                     setState(() {
                       _isLoading = false;

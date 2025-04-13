@@ -1,9 +1,12 @@
+// lib/screens/onboarding/onboarding_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'onboarding_model.dart';
 import 'onboarding_widget.dart';
-import '../../common/color_extension.dart'; // Import TColor
-import '../../routes/routes.dart'; // Import AppRoutes
+import '../../common/color_extension.dart';
+import '../../routes/routes.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -40,9 +43,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     });
   }
 
-  void _navigateToSignUp(BuildContext context) {
-    // Changed method name and navigation target
-    context.go(AppRoutes.signup); // Navigate to signup screen instead of login
+  void _completeOnboarding(BuildContext context) async {
+    // Mark onboarding as completed
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('completed_onboarding', true);
+
+    // Navigate to signup
+    if (context.mounted) {
+      context.go(AppRoutes.signup);
+    }
   }
 
   @override
@@ -84,8 +93,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               padding: const EdgeInsets.all(20.0),
               child: ElevatedButton(
                 onPressed: _currentPage == onboardingData.length - 1
-                    ? () =>
-                        _navigateToSignUp(context) // Updated to use new method
+                    ? () => _completeOnboarding(context)
                     : () {
                         _pageController.nextPage(
                           duration: const Duration(milliseconds: 300),
