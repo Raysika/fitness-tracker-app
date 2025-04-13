@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../common/color_extension.dart';
 import '../../routes/routes.dart';
+import '../../services/supabase_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -18,6 +19,8 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+  final SupabaseService _supabaseService = SupabaseService();
+  bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _acceptTerms = false;
@@ -271,14 +274,35 @@ class _SignupScreenState extends State<SignupScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       if (_formKey.currentState!.validate() && _acceptTerms) {
-                        context.go(AppRoutes.completeProfile);
+                        setState(() {
+                          _isLoading = true;
+                        });
+
+                        try {
+                          await _supabaseService.signUp(
+                            _emailController.text,
+                            _passwordController.text,
+                            _firstNameController.text,
+                            _lastNameController.text,
+                          );
+                          context.go(AppRoutes.completeProfile);
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Error: ${e.toString()}")),
+                          );
+                        } finally {
+                          setState(() {
+                            _isLoading = false;
+                          });
+                        }
                       } else if (!_acceptTerms) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                              content: Text(
-                                  "Please accept the terms and conditions")),
+                            content:
+                                Text("Please accept the terms and conditions"),
+                          ),
                         );
                       }
                     },
@@ -290,7 +314,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    child: const Text("Register"),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("Register"),
                   ),
                 ),
                 const SizedBox(height: 30),

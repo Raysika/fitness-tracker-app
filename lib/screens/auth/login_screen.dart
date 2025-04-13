@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../common/color_extension.dart';
 import '../../routes/routes.dart';
 import '../../themes/theme.dart';
+import '../../services/supabase_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +17,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final SupabaseService _supabaseService = SupabaseService();
+  bool _isLoading = false;
   bool _obscurePassword = true;
   bool _rememberMe = false;
 
@@ -180,13 +183,43 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {
+                    onPressed: () async {
                       if (_formKey.currentState!.validate()) {
-                        context.go(AppRoutes.home);
+                        setState(() {
+                          _isLoading = true;
+                        });
+
+                        try {
+                          await _supabaseService.signIn(
+                            _emailController.text,
+                            _passwordController.text,
+                          );
+                          context.go(AppRoutes.home);
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text("Login failed: ${e.toString()}")),
+                          );
+                        } finally {
+                          setState(() {
+                            _isLoading = false;
+                          });
+                        }
                       }
                     },
-                    icon: Icon(Icons.login, color: TColor.white),
-                    label: const Text("Login"),
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Icon(Icons.login, color: TColor.white),
+                    label: _isLoading
+                        ? const Text("Logging in...")
+                        : const Text("Login"),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: TColor.primaryColor1,
                       foregroundColor: TColor.white,

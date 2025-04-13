@@ -1,6 +1,12 @@
 // lib/screens/dashboard/profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:fitness_tracker/common/color_extension.dart';
+import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:go_router/go_router.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/supabase_service.dart';
+import '../../routes/routes.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -10,16 +16,51 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Mock user data - in a real app, this would come from your database
-  final Map<String, dynamic> userData = {
-    'name': 'Stefani Wong',
-    'email': 'stefani.wong@example.com',
-    'goal': 'Lose Fat', // This would come from onboarding
-    'height': '170 cm',
-    'weight': '65 kg',
-    'bmi': '20.1',
-    'joinDate': 'Joined May 2023',
-  };
+  late Map<String, dynamic> userData;
+  final SupabaseService _supabaseService = SupabaseService();
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final profile = await _supabaseService.getUserProfile();
+    if (profile != null) {
+      setState(() {
+        userData = {
+          'name':
+              '${profile['first_name'] ?? ''} ${profile['last_name'] ?? ''}',
+          'email': Supabase.instance.client.auth.currentUser?.email ?? '',
+          'goal': profile['fitness_goal'] ?? 'Not set',
+          'height': '${profile['height'] ?? 0} cm',
+          'weight': '${profile['weight'] ?? 0} kg',
+          'bmi': _calculateBMI(profile['height'], profile['weight']),
+          'joinDate': 'Joined ${_formatDate(profile['created_at'])}',
+        };
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _calculateBMI(double? height, double? weight) {
+    if (height == null || weight == null || height == 0) return 'N/A';
+    final heightInMeters = height / 100;
+    final bmi = weight / (heightInMeters * heightInMeters);
+    return bmi.toStringAsFixed(1);
+  }
+
+  String _formatDate(String? isoString) {
+    if (isoString == null) return 'N/A';
+    try {
+      final date = DateTime.parse(isoString);
+      return '${date.month}/${date.year}';
+    } catch (e) {
+      return 'N/A';
+    }
+  }
 
   bool _isDarkMode = false;
 
@@ -28,129 +69,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: TColor.white,
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-
-              // Profile Header
-              Center(
+        child: _isLoading
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20.0),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            : Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: TColor.primaryColor1,
-                          width: 2,
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/profile_placeholder.jpg',
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    Text(
-                      userData['name'],
-                      style: TextStyle(
-                        color: TColor.black,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      userData['email'],
-                      style: TextStyle(
-                        color: TColor.gray,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      userData['joinDate'],
-                      style: TextStyle(
-                        color: TColor.gray,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
+                    const SizedBox(height: 20),
 
-              // User Information Section
-              Text(
-                "Personal Information",
-                style: TextStyle(
-                  color: TColor.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 15),
-              _buildInfoCard(
-                icon: Icons.person_outline,
-                title: "Name",
-                value: userData['name'],
-                onTap: () => _editProfileField('Name'),
-              ),
-              _buildInfoCard(
-                icon: Icons.email_outlined,
-                title: "Email",
-                value: userData['email'],
-                onTap: () => _editProfileField('Email'),
-              ),
-              _buildInfoCard(
-                icon: Icons.height,
-                title: "Height",
-                value: userData['height'],
-                onTap: () => _editProfileField('Height'),
-              ),
-              _buildInfoCard(
-                icon: Icons.monitor_weight_outlined,
-                title: "Weight",
-                value: userData['weight'],
-                onTap: () => _editProfileField('Weight'),
-              ),
-              const SizedBox(height: 25),
-
-              // Fitness Goals Section (from onboarding)
-              Text(
-                "Fitness Goals",
-                style: TextStyle(
-                  color: TColor.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 15),
-              Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: TColor.lightGray.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.flag_outlined,
-                      color: TColor.primaryColor1,
-                      size: 30,
-                    ),
-                    const SizedBox(width: 15),
-                    Expanded(
+                    // Profile Header
+                    Center(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: TColor.primaryColor1,
+                                width: 2,
+                              ),
+                            ),
+                            child: ClipOval(
+                              child: Image.asset(
+                                'assets/images/profile_placeholder.jpg',
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 15),
                           Text(
-                            "Primary Goal",
+                            userData['name'],
+                            style: TextStyle(
+                              color: TColor.black,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            userData['email'],
                             style: TextStyle(
                               color: TColor.gray,
                               fontSize: 14,
@@ -158,94 +123,178 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            userData['goal'],
+                            userData['joinDate'],
                             style: TextStyle(
-                              color: TColor.black,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              color: TColor.gray,
+                              fontSize: 12,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.arrow_forward_ios,
-                        color: TColor.gray,
-                        size: 18,
+                    const SizedBox(height: 30),
+
+                    // User Information Section
+                    Text(
+                      "Personal Information",
+                      style: TextStyle(
+                        color: TColor.black,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
-                      onPressed: () => _editGoal(),
                     ),
+                    const SizedBox(height: 15),
+                    _buildInfoCard(
+                      icon: Icons.person_outline,
+                      title: "Name",
+                      value: userData['name'],
+                      onTap: () => _editProfileField('Name'),
+                    ),
+                    _buildInfoCard(
+                      icon: Icons.email_outlined,
+                      title: "Email",
+                      value: userData['email'],
+                      onTap: () => _editProfileField('Email'),
+                    ),
+                    _buildInfoCard(
+                      icon: Icons.height,
+                      title: "Height",
+                      value: userData['height'],
+                      onTap: () => _editProfileField('Height'),
+                    ),
+                    _buildInfoCard(
+                      icon: Icons.monitor_weight_outlined,
+                      title: "Weight",
+                      value: userData['weight'],
+                      onTap: () => _editProfileField('Weight'),
+                    ),
+                    const SizedBox(height: 25),
+
+                    // Fitness Goals Section (from onboarding)
+                    Text(
+                      "Fitness Goals",
+                      style: TextStyle(
+                        color: TColor.black,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    Container(
+                      padding: const EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: TColor.lightGray.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.flag_outlined,
+                            color: TColor.primaryColor1,
+                            size: 30,
+                          ),
+                          const SizedBox(width: 15),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Primary Goal",
+                                  style: TextStyle(
+                                    color: TColor.gray,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  userData['goal'],
+                                  style: TextStyle(
+                                    color: TColor.black,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.arrow_forward_ios,
+                              color: TColor.gray,
+                              size: 18,
+                            ),
+                            onPressed: () => _editGoal(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 25),
+
+                    // App Preferences Section
+                    Text(
+                      "App Preferences",
+                      style: TextStyle(
+                        color: TColor.black,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    Container(
+                      padding: const EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: TColor.lightGray.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildPreferenceSwitch(
+                            icon: Icons.dark_mode_outlined,
+                            title: "Dark Mode",
+                            value: _isDarkMode,
+                            onChanged: (value) {
+                              setState(() {
+                                _isDarkMode = value;
+                                // In a real app, you would update the app theme here
+                                // AppTheme.setDarkMode(value);
+                              });
+                            },
+                          ),
+                          const Divider(height: 25),
+                          _buildPreferenceItem(
+                            icon: Icons.notifications_none,
+                            title: "Notifications",
+                            onTap: () => _manageNotifications(),
+                          ),
+                          const Divider(height: 25),
+                          _buildPreferenceItem(
+                            icon: Icons.language,
+                            title: "Language",
+                            onTap: () => _changeLanguage(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Logout Button
+                    Center(
+                      child: TextButton(
+                        onPressed: () => _confirmLogout(),
+                        child: Text(
+                          "Logout",
+                          style: TextStyle(
+                            color: TColor.primaryColor1,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
-              const SizedBox(height: 25),
-
-              // App Preferences Section
-              Text(
-                "App Preferences",
-                style: TextStyle(
-                  color: TColor.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 15),
-              Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: TColor.lightGray.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Column(
-                  children: [
-                    _buildPreferenceSwitch(
-                      icon: Icons.dark_mode_outlined,
-                      title: "Dark Mode",
-                      value: _isDarkMode,
-                      onChanged: (value) {
-                        setState(() {
-                          _isDarkMode = value;
-                          // In a real app, you would update the app theme here
-                          // AppTheme.setDarkMode(value);
-                        });
-                      },
-                    ),
-                    const Divider(height: 25),
-                    _buildPreferenceItem(
-                      icon: Icons.notifications_none,
-                      title: "Notifications",
-                      onTap: () => _manageNotifications(),
-                    ),
-                    const Divider(height: 25),
-                    _buildPreferenceItem(
-                      icon: Icons.language,
-                      title: "Language",
-                      onTap: () => _changeLanguage(),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
-
-              // Logout Button
-              Center(
-                child: TextButton(
-                  onPressed: () => _confirmLogout(),
-                  child: Text(
-                    "Logout",
-                    style: TextStyle(
-                      color: TColor.primaryColor1,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -394,10 +443,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Text("Cancel"),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              // In a real app, you would handle logout logic here
-              print("User logged out");
+              await context.read<AuthProvider>().signOut();
+              context.go(AppRoutes.login);
             },
             child: Text(
               "Logout",

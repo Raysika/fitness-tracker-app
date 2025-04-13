@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../common/color_extension.dart';
 import '../../routes/routes.dart';
 import '../../themes/theme.dart';
+import '../../services/supabase_service.dart';
 
 class GoalSelectionScreen extends StatefulWidget {
   const GoalSelectionScreen({super.key});
@@ -13,6 +14,9 @@ class GoalSelectionScreen extends StatefulWidget {
 }
 
 class _GoalSelectionScreenState extends State<GoalSelectionScreen> {
+  final SupabaseService _supabaseService = SupabaseService();
+  int _selectedGoalIndex = 0;
+  bool _isLoading = false;
   final List<Map<String, String>> goalOptions = [
     {
       "image": "assets/images/goal_1.png",
@@ -32,6 +36,8 @@ class _GoalSelectionScreenState extends State<GoalSelectionScreen> {
       "description": "I want to drop fat and gain\nmuscle mass"
     },
   ];
+  String get _selectedGoal =>
+      goalOptions[_selectedGoalIndex]["title"] ?? "Improve Shape";
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +140,11 @@ class _GoalSelectionScreenState extends State<GoalSelectionScreen> {
                   viewportFraction: 0.75,
                   enlargeCenterPage: true,
                   enableInfiniteScroll: false,
+                  onPageChanged: (index, reason) {
+                    setState(() {
+                      _selectedGoalIndex = index;
+                    });
+                  },
                 ),
               ),
             ),
@@ -142,8 +153,25 @@ class _GoalSelectionScreenState extends State<GoalSelectionScreen> {
             Padding(
               padding: const EdgeInsets.all(25),
               child: ElevatedButton(
-                onPressed: () {
-                  context.go(AppRoutes.welcome);
+                onPressed: () async {
+                  setState(() {
+                    _isLoading = true;
+                  });
+
+                  try {
+                    await _supabaseService.updateUserProfile(
+                      fitnessGoal: _selectedGoal,
+                    );
+                    context.go(AppRoutes.welcome);
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Error: ${e.toString()}")),
+                    );
+                  } finally {
+                    setState(() {
+                      _isLoading = false;
+                    });
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: TColor.primaryColor1,
@@ -156,12 +184,22 @@ class _GoalSelectionScreenState extends State<GoalSelectionScreen> {
                   elevation: 5,
                   shadowColor: TColor.primaryColor1.withOpacity(0.3),
                 ),
-                child: Text(
-                  "Confirm",
-                  style: AppTheme.lightTheme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Text(
+                        "Confirm",
+                        style:
+                            AppTheme.lightTheme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ],

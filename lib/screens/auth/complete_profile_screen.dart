@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../common/color_extension.dart'; // Import TColor
 import '../../themes/theme.dart'; // Import AppTheme
+import '../../services/supabase_service.dart';
 
 class CompleteProfileScreen extends StatefulWidget {
   const CompleteProfileScreen({super.key});
@@ -19,16 +20,38 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final TextEditingController _heightController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
   String _selectedGender = 'Male';
-
-  void _submitForm() {
+  final SupabaseService _supabaseService = SupabaseService();
+  bool _isLoading = false;
+  void _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      // Handle form submission
-    context.go(AppRoutes.goalSelection);
-      print('Name: ${_nameController.text}');
-      print('Gender: $_selectedGender');
-      print('DOB: ${_dobController.text}');
-      print('Height: ${_heightController.text}');
-      print('Weight: ${_weightController.text}');
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        await _supabaseService.updateUserProfile(
+          gender: _selectedGender,
+          dateOfBirth: _dobController.text,
+          height: double.parse(_heightController.text),
+          weight: double.parse(_weightController.text),
+        );
+
+        // Also add initial body measurement
+        await _supabaseService.addBodyMeasurement(
+          weight: double.parse(_weightController.text),
+          height: double.parse(_heightController.text),
+        );
+
+        context.go(AppRoutes.goalSelection);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}")),
+        );
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -52,7 +75,6 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               // Add the image at the top
               Image.asset(
                 'assets/images/complete_profile.png', // Path to your image
-                
               ),
               const SizedBox(height: 20), // Add some spacing
               Text(
@@ -244,7 +266,16 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       horizontal: 40,
                     ),
                   ),
-                  child: const Text('Continue'),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text('Continue'),
                 ),
               ),
             ],

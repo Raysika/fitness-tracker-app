@@ -1,6 +1,7 @@
 // lib/screens/dashboard/workout_screen.dart
 import 'package:flutter/material.dart';
 import 'package:fitness_tracker/common/color_extension.dart';
+import '../../services/supabase_service.dart';
 
 class WorkoutScreen extends StatefulWidget {
   const WorkoutScreen({super.key});
@@ -10,8 +11,35 @@ class WorkoutScreen extends StatefulWidget {
 }
 
 class _WorkoutScreenState extends State<WorkoutScreen> {
+  final SupabaseService _supabaseService = SupabaseService();
   int selectedTabIndex = 0;
   final List<String> tabs = ["All", "Fullbody", "Upper", "Lower", "Abs"];
+
+  Future<void> _logCompletedWorkout({
+    required String title,
+    required int durationMinutes,
+    required int caloriesBurned,
+    required String workoutType,
+    required String difficultyLevel,
+  }) async {
+    try {
+      await _supabaseService.logWorkout(
+        title: title,
+        durationMinutes: durationMinutes,
+        caloriesBurned: caloriesBurned,
+        workoutType: workoutType,
+        difficultyLevel: difficultyLevel,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Workout logged successfully!")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error logging workout: ${e.toString()}")),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -384,10 +412,44 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 width: 40,
                 height: 120,
                 alignment: Alignment.center,
-                child: Icon(
-                  Icons.play_circle_filled,
-                  size: 30,
-                  color: Colors.white,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Icon(
+                      Icons.play_circle_filled,
+                      size: 30,
+                      color: Colors.white,
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        _logCompletedWorkout(
+                          title: title,
+                          durationMinutes: int.parse(time.split(' ')[0]),
+                          caloriesBurned: 200, // Default value
+                          workoutType: title.contains('Full')
+                              ? 'full_body'
+                              : title.contains('Upper')
+                                  ? 'upper_body'
+                                  : title.contains('Lower')
+                                      ? 'lower_body'
+                                      : 'other',
+                          difficultyLevel: level.toLowerCase(),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: color[0],
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        "Complete",
+                        style: TextStyle(fontSize: 10),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

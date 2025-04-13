@@ -8,8 +8,38 @@ import 'package:fitness_tracker/screens/auth/login_screen.dart';
 import 'package:fitness_tracker/screens/auth/signup_screen.dart';
 import 'package:fitness_tracker/screens/onboarding/onboarding_screen.dart';
 import 'routes.dart'; // Import the routes.dart file
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final GoRouter appRouter = GoRouter(
+  initialLocation: AppRoutes.splash,
+  redirect: (context, state) {
+    final supabase = Supabase.instance.client;
+    final isAuthenticated = supabase.auth.currentUser != null;
+    final isAuthRoute = state.matchedLocation == AppRoutes.login || 
+                        state.matchedLocation == AppRoutes.signup;
+    final isOnboardingRoute = state.matchedLocation == AppRoutes.onboarding ||
+                             state.matchedLocation == AppRoutes.completeProfile ||
+                             state.matchedLocation == AppRoutes.goalSelection ||
+                             state.matchedLocation == AppRoutes.welcome;
+    
+    // Allow access to splash screen
+    if (state.matchedLocation == AppRoutes.splash) {
+      return null;
+    }
+    
+    // If not authenticated and trying to access protected route
+    if (!isAuthenticated && !isAuthRoute && !isOnboardingRoute) {
+      return AppRoutes.login;
+    }
+    
+    // If authenticated and trying to access auth route
+    if (isAuthenticated && isAuthRoute) {
+      return AppRoutes.home;
+    }
+    
+    // No redirection needed
+    return null;
+  },
   routes: [
     GoRoute(
       path: AppRoutes.splash,
