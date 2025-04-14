@@ -5,6 +5,7 @@ import 'package:fitness_tracker/common/color_extension.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../routes/routes.dart';
@@ -303,6 +304,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Reset App State Button
+                    Center(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          // Show confirmation dialog
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text("Reset App State"),
+                              content: const Text(
+                                "This will clear all app data and return to the splash screen. "
+                                "Use this for development purposes only. Continue?",
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text("Cancel"),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text("Reset"),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirmed == true) {
+                            // Get router reference before clearing state
+                            final router = GoRouter.of(context);
+
+                            // Clear preferences and sign out
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.clear();
+                            await Supabase.instance.client.auth.signOut();
+
+                            // Navigate back to splash
+                            router.go(AppRoutes.splash);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade50,
+                          foregroundColor: Colors.red,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(color: Colors.red.shade200),
+                          ),
+                        ),
+                        child: const Text("Reset App State (Development Only)"),
                       ),
                     ),
                     const SizedBox(height: 20),
