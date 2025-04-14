@@ -17,7 +17,6 @@ class CompleteProfileScreen extends StatefulWidget {
 
 class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
@@ -92,29 +91,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Full Name',
-                  labelStyle: TextStyle(color: TColor.black),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: TColor.primaryColor1),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: TColor.primaryColor1),
-                  ),
-                ),
-                style: TextStyle(color: TColor.black),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
+
+              // Gender selection
               DropdownButtonFormField<String>(
                 value: _selectedGender,
                 decoration: InputDecoration(
@@ -144,6 +122,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 },
               ),
               const SizedBox(height: 20),
+
+              // Date of birth
               TextFormField(
                 controller: _dobController,
                 decoration: InputDecoration(
@@ -180,6 +160,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 },
               ),
               const SizedBox(height: 20),
+
+              // Height field
               TextFormField(
                 controller: _heightController,
                 decoration: InputDecoration(
@@ -204,6 +186,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 },
               ),
               const SizedBox(height: 20),
+
+              // Weight field
               TextFormField(
                 controller: _weightController,
                 decoration: InputDecoration(
@@ -228,6 +212,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 },
               ),
               const SizedBox(height: 40),
+
+              // Continue button
               Center(
                 child: ElevatedButton(
                   onPressed: _submitForm,
