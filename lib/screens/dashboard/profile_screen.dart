@@ -6,7 +6,10 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../routes/routes.dart';
 
@@ -21,6 +24,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late Map<String, dynamic> userData;
   final SupabaseService _supabaseService = SupabaseService();
   bool _isLoading = true;
+  String? _profileImageUrl;
+  File? _selectedImage;
 
   @override
   void initState() {
@@ -48,13 +53,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         userData = {
           'name':
               '${profile['first_name'] ?? ''} ${profile['last_name'] ?? ''}',
+          'firstName': profile['first_name'] ?? '',
+          'lastName': profile['last_name'] ?? '',
           'email': Supabase.instance.client.auth.currentUser?.email ?? '',
           'goal': profile['fitness_goal'] ?? 'Not set',
           'height': height != null ? '$height cm' : 'Not set',
           'weight': weight != null ? '$weight kg' : 'Not set',
+          'gender': profile['gender'] ?? 'Not set',
+          'heightValue': height,
+          'weightValue': weight,
           'bmi': _calculateBMI(height, weight),
           'joinDate': 'Joined ${_formatDate(profile['created_at'])}',
         };
+        _profileImageUrl = profile['profile_image_url'];
         _isLoading = false;
       });
     }
@@ -77,12 +88,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  bool _isDarkMode = false;
+  Future<void> _pickAndUploadImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      setState(() {
+        _selectedImage = File(image.path);
+        _isLoading = true;
+      });
+
+      try {
+        final imageUrl =
+            await _supabaseService.uploadProfileImage(_selectedImage!);
+        if (imageUrl != null) {
+          setState(() {
+            _profileImageUrl = imageUrl;
+          });
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
-      backgroundColor: TColor.white,
+      backgroundColor: TColor.backgroundColor(context),
       body: SingleChildScrollView(
         child: _isLoading
             ? const Center(
@@ -103,6 +144,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Center(
                       child: Column(
                         children: [
+                          GestureDetector(
+                            onTap: _pickAndUploadImage,
+                            child: Stack(
+                        children: [
                           Container(
                             width: 120,
                             height: 120,
@@ -114,17 +159,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                             child: ClipOval(
-                              child: Image.asset(
+                                    child: _profileImageUrl != null
+                                        ? Image.network(
+                                            _profileImageUrl!,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                              return Image.asset(
+                                                'assets/images/profile_placeholder.jpg',
+                                                fit: BoxFit.cover,
+                                              );
+                                            },
+                                          )
+                                        : Image.asset(
                                 'assets/images/profile_placeholder.jpg',
                                 fit: BoxFit.cover,
                               ),
+                                  ),
+                                ),
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: TColor.primaryColor1,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.edit,
+                                      color: TColor.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 15),
                           Text(
                             userData['name'],
                             style: TextStyle(
-                              color: TColor.black,
+                              color: TColor.textColor(context),
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                             ),
@@ -132,7 +208,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Text(
                             userData['email'],
                             style: TextStyle(
-                              color: TColor.gray,
+                              color: TColor.grayColor(context),
                               fontSize: 14,
                             ),
                           ),
@@ -140,7 +216,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Text(
                             userData['joinDate'],
                             style: TextStyle(
-                              color: TColor.gray,
+                              color: TColor.grayColor(context),
                               fontSize: 12,
                             ),
                           ),
@@ -153,7 +229,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Text(
                       "Personal Information",
                       style: TextStyle(
-                        color: TColor.black,
+                        color: TColor.textColor(context),
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -170,6 +246,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: "Email",
                       value: userData['email'],
                       onTap: () => _editProfileField('Email'),
+                    ),
+                    _buildInfoCard(
+                      icon: Icons.person,
+                      title: "Gender",
+                      value: userData['gender'],
+                      onTap: () => _editProfileField('Gender'),
                     ),
                     _buildInfoCard(
                       icon: Icons.height,
@@ -189,7 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Text(
                       "Fitness Goals",
                       style: TextStyle(
-                        color: TColor.black,
+                        color: TColor.textColor(context),
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -198,7 +280,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Container(
                       padding: const EdgeInsets.all(15),
                       decoration: BoxDecoration(
-                        color: TColor.lightGray.withOpacity(0.3),
+                        color: TColor.lightGrayColor(context),
                         borderRadius: BorderRadius.circular(15),
                       ),
                       child: Row(
@@ -216,7 +298,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 Text(
                                   "Primary Goal",
                                   style: TextStyle(
-                                    color: TColor.gray,
+                                    color: TColor.grayColor(context),
                                     fontSize: 14,
                                   ),
                                 ),
@@ -224,7 +306,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 Text(
                                   userData['goal'],
                                   style: TextStyle(
-                                    color: TColor.black,
+                                    color: TColor.textColor(context),
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -235,7 +317,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           IconButton(
                             icon: Icon(
                               Icons.arrow_forward_ios,
-                              color: TColor.gray,
+                              color: TColor.grayColor(context),
                               size: 18,
                             ),
                             onPressed: () => _editGoal(),
@@ -249,7 +331,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Text(
                       "App Preferences",
                       style: TextStyle(
-                        color: TColor.black,
+                        color: TColor.textColor(context),
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -258,7 +340,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Container(
                       padding: const EdgeInsets.all(15),
                       decoration: BoxDecoration(
-                        color: TColor.lightGray.withOpacity(0.3),
+                        color: TColor.lightGrayColor(context),
                         borderRadius: BorderRadius.circular(15),
                       ),
                       child: Column(
@@ -266,26 +348,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           _buildPreferenceSwitch(
                             icon: Icons.dark_mode_outlined,
                             title: "Dark Mode",
-                            value: _isDarkMode,
+                            value: themeProvider.isDarkMode,
                             onChanged: (value) {
-                              setState(() {
-                                _isDarkMode = value;
-                                // In a real app, you would update the app theme here
-                                // AppTheme.setDarkMode(value);
-                              });
+                              themeProvider.toggleTheme();
                             },
-                          ),
-                          const Divider(height: 25),
-                          _buildPreferenceItem(
-                            icon: Icons.notifications_none,
-                            title: "Notifications",
-                            onTap: () => _manageNotifications(),
-                          ),
-                          const Divider(height: 25),
-                          _buildPreferenceItem(
-                            icon: Icons.language,
-                            title: "Language",
-                            onTap: () => _changeLanguage(),
                           ),
                         ],
                       ),
@@ -377,7 +443,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: TColor.lightGray.withOpacity(0.3),
+        color: TColor.lightGrayColor(context),
         borderRadius: BorderRadius.circular(15),
       ),
       child: Row(
@@ -391,7 +457,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   title,
                   style: TextStyle(
-                    color: TColor.gray,
+                    color: TColor.grayColor(context),
                     fontSize: 14,
                   ),
                 ),
@@ -399,7 +465,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   value,
                   style: TextStyle(
-                    color: TColor.black,
+                    color: TColor.textColor(context),
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -410,7 +476,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           IconButton(
             icon: Icon(
               Icons.arrow_forward_ios,
-              color: TColor.gray,
+              color: TColor.grayColor(context),
               size: 18,
             ),
             onPressed: onTap,
@@ -434,7 +500,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Text(
             title,
             style: TextStyle(
-              color: TColor.black,
+              color: TColor.textColor(context),
               fontSize: 16,
             ),
           ),
@@ -448,55 +514,282 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildPreferenceItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Icon(icon, color: TColor.primaryColor1, size: 24),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                color: TColor.black,
-                fontSize: 16,
-              ),
-            ),
+  // Edit profile field
+  void _editProfileField(String field) {
+    String? initialValue;
+    String hintText = '';
+    TextInputType inputType = TextInputType.text;
+
+    switch (field) {
+      case 'Name':
+        initialValue = userData['name'];
+        hintText = 'Enter your full name';
+        break;
+      case 'Email':
+        initialValue = userData['email'];
+        hintText = 'Enter your email';
+        inputType = TextInputType.emailAddress;
+        break;
+      case 'Gender':
+        _showGenderPicker();
+        return;
+      case 'Height':
+        _showHeightWeightEditor(true);
+        return;
+      case 'Weight':
+        _showHeightWeightEditor(false);
+        return;
+      default:
+        initialValue = '';
+    }
+
+    if (field == 'Email') {
+      // Show notification that email can't be changed
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email address cannot be changed.'),
+        ),
+      );
+      return;
+    }
+
+    // For name, show name editor
+    if (field == 'Name') {
+      _showNameEditor();
+      return;
+    }
+
+    // For others, show generic text editor
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit $field'),
+        content: TextField(
+          controller: TextEditingController(text: initialValue),
+          decoration: InputDecoration(hintText: hintText),
+          keyboardType: inputType,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
-          Icon(
-            Icons.arrow_forward_ios,
-            color: TColor.gray,
-            size: 18,
+          TextButton(
+            onPressed: () {
+              // Save changes logic here
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
           ),
         ],
       ),
     );
   }
 
-  // Mock functions for the actions
-  void _editProfileField(String field) {
-    // In a real app, this would open an edit dialog
-    print("Editing $field");
+  void _showNameEditor() {
+    final firstNameController =
+        TextEditingController(text: userData['firstName']);
+    final lastNameController =
+        TextEditingController(text: userData['lastName']);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Name'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+        children: [
+            TextField(
+              controller: firstNameController,
+              decoration: const InputDecoration(labelText: 'First Name'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: lastNameController,
+              decoration: const InputDecoration(labelText: 'Last Name'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              setState(() => _isLoading = true);
+
+              try {
+                await _supabaseService.updateUserProfile(
+                  firstName: firstNameController.text,
+                  lastName: lastNameController.text,
+                );
+                await _loadUserData(); // Refresh data
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error updating name: $e')),
+                );
+                setState(() => _isLoading = false);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showGenderPicker() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Gender'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Male'),
+              onTap: () async {
+                Navigator.pop(context);
+                setState(() => _isLoading = true);
+                await _supabaseService.updateUserProfile(gender: 'Male');
+                await _loadUserData();
+              },
+            ),
+            ListTile(
+              title: const Text('Female'),
+              onTap: () async {
+                Navigator.pop(context);
+                setState(() => _isLoading = true);
+                await _supabaseService.updateUserProfile(gender: 'Female');
+                await _loadUserData();
+              },
+            ),
+            ListTile(
+              title: const Text('Other'),
+              onTap: () async {
+                Navigator.pop(context);
+                setState(() => _isLoading = true);
+                await _supabaseService.updateUserProfile(gender: 'Other');
+                await _loadUserData();
+              },
+            ),
+            ListTile(
+              title: const Text('Prefer not to say'),
+              onTap: () async {
+                Navigator.pop(context);
+                setState(() => _isLoading = true);
+                await _supabaseService.updateUserProfile(
+                    gender: 'Prefer not to say');
+                await _loadUserData();
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHeightWeightEditor(bool isHeight) {
+    final controller = TextEditingController(
+        text: isHeight
+            ? userData['heightValue']?.toString() ?? ''
+            : userData['weightValue']?.toString() ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit ${isHeight ? 'Height' : 'Weight'}'),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            labelText: isHeight ? 'Height (cm)' : 'Weight (kg)',
+            suffixText: isHeight ? 'cm' : 'kg',
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+
+              if (controller.text.isEmpty) return;
+
+              try {
+                final value = double.parse(controller.text);
+                setState(() => _isLoading = true);
+
+                if (isHeight) {
+                  await _supabaseService.updateUserProfile(height: value);
+                } else {
+                  await _supabaseService.updateUserProfile(weight: value);
+                }
+
+                await _loadUserData();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Please enter a valid number')),
+                );
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _editGoal() {
-    // This would navigate to a goal selection screen
-    print("Editing goal");
-  }
+    final goals = [
+      'Lose Weight',
+      'Build Muscle',
+      'Improve Fitness',
+      'Increase Flexibility',
+      'Maintain Health'
+    ];
 
-  void _manageNotifications() {
-    // This would open notification settings
-    print("Managing notifications");
-  }
-
-  void _changeLanguage() {
-    // This would open language selection
-    print("Changing language");
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Goal'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: goals.length,
+            itemBuilder: (context, index) {
+              return ListTile(
+                title: Text(goals[index]),
+                onTap: () async {
+                  Navigator.pop(context);
+                  setState(() => _isLoading = true);
+                  await _supabaseService.updateUserProfile(
+                      fitnessGoal: goals[index]);
+                  await _loadUserData();
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _confirmLogout() {
