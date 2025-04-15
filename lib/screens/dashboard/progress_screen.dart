@@ -2,7 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:fitness_tracker/common/color_extension.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
 import '../../services/supabase_service.dart';
+import '../../services/body_fat_calculator.dart';
+import '../../providers/theme_provider.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -18,20 +21,26 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   // Selected metric for main chart
   String selectedMetric = "Weight";
-  List<String> metrics = ["Weight", "Steps", "Calories", "Workouts"];
+  List<String> metrics = ["Weight", "Body Fat", "Workouts"];
 
   final SupabaseService _supabaseService = SupabaseService();
   List<Map<String, dynamic>> _measurements = [];
   bool _isLoading = true;
+  String _userGender = 'male'; // Default gender
 
   @override
   void initState() {
     super.initState();
-    _loadMeasurements();
+    _loadUserData();
   }
 
-  Future<void> _loadMeasurements() async {
+  Future<void> _loadUserData() async {
     try {
+      final profile = await _supabaseService.getUserProfile();
+      if (profile != null) {
+        _userGender = profile['gender'] ?? 'male';
+      }
+
       final measurements = await _supabaseService.getBodyMeasurements();
       setState(() {
         _measurements = measurements;
@@ -125,15 +134,29 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return "Obese";
   }
 
+  // Get body fat category
+  String _getBodyFatCategory(double bodyFat) {
+    return BodyFatCalculator.getBodyFatCategory(_userGender, bodyFat);
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Check if dark mode is enabled
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     // Calculate BMI only once
     String bmiValue = _calculateBMI();
     String bmiCategory =
         bmiValue != "N/A" ? _getBMICategory(double.parse(bmiValue)) : "Unknown";
 
+    // Get latest body fat percentage
+    double? bodyFatPercentage = _getLatestMeasurement('body_fat_percentage');
+    String bodyFatCategory = bodyFatPercentage != null
+        ? _getBodyFatCategory(bodyFatPercentage)
+        : "Unknown";
+
     return Scaffold(
-      backgroundColor: TColor.white,
+      backgroundColor: TColor.backgroundColor(context),
       body: SafeArea(
         child: _isLoading
             ? Center(
@@ -146,33 +169,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     children: [
                       SizedBox(height: 15),
 
-                      // Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
+                      // Header - removed the top right icon
                           Text(
                             "Progress",
                             style: TextStyle(
-                              color: TColor.black,
+                          color: TColor.textColor(context),
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
                             ),
-                          ),
-                          Container(
-                            height: 40,
-                            width: 40,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(15),
-                              color: TColor.lightGray,
-                            ),
-                            alignment: Alignment.center,
-                            child: Icon(
-                              Icons.calendar_today_outlined,
-                              color: TColor.gray,
-                              size: 20,
-                            ),
-                          ),
-                        ],
                       ),
 
                       SizedBox(height: 20),
@@ -260,13 +264,95 @@ class _ProgressScreenState extends State<ProgressScreen> {
                                   icon: Icons.speed_outlined,
                                 ),
                                 SizedBox(width: 15),
-                                statItem(
-                                  title: "Body Fat",
-                                  value:
-                                      "${_getLatestMeasurement('body_fat_percentage')?.toStringAsFixed(1) ?? '--'}%",
-                                  subtitle:
-                                      "${_formatChange(_getLatestMeasurement('body_fat_percentage'), _getPreviousMeasurement('body_fat_percentage'))}% this month",
-                                  icon: Icons.pie_chart_outline,
+                                // Body fat with tooltip
+                                Expanded(
+                                  child: Tooltip(
+                                    message: bodyFatPercentage != null
+                                        ? "Estimated using ${_measurements.first['waist'] != null ? 'U.S. Navy formula' : 'BMI-based calculation'}"
+                                        : "No body fat data available",
+                                    child: Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                height: 30,
+                                                width: 30,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white
+                                                      .withOpacity(0.3),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                alignment: Alignment.center,
+                                                child: Icon(
+                                                  Icons.pie_chart_outline,
+                                                  color: TColor.white,
+                                                  size: 18,
+                                                ),
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                "Body Fat",
+                                                style: TextStyle(
+                                                  color: TColor.white
+                                                      .withOpacity(0.7),
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                              SizedBox(width: 4),
+                                              Icon(
+                                                Icons.info_outline,
+                                                color: TColor.white
+                                                    .withOpacity(0.7),
+                                                size: 14,
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(height: 8),
+                                          Text(
+                                            "${bodyFatPercentage?.toStringAsFixed(1) ?? '--'}%",
+                                            style: TextStyle(
+                                              color: TColor.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          SizedBox(height: 5),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  bodyFatCategory,
+                                                  style: TextStyle(
+                                                    color: TColor.white
+                                                        .withOpacity(0.7),
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Text(
+                                            "Estimated value",
+                                            style: TextStyle(
+                                              color:
+                                                  TColor.white.withOpacity(0.5),
+                                              fontSize: 9,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -276,14 +362,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
                       SizedBox(height: 20),
 
-                      // Measurement Tracking Section
+                      // Measurement Tracking Section - header only (removed cards)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             "Measurements",
                             style: TextStyle(
-                              color: TColor.black,
+                              color: TColor.textColor(context),
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                             ),
@@ -293,7 +379,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                               // Show dialog to add new measurement
                               bool? result = await _showAddMeasurementDialog();
                               if (result == true) {
-                                _loadMeasurements(); // Reload measurements after adding
+                                _loadUserData(); // Reload measurements after adding
                               }
                             },
                             child: Row(
@@ -318,67 +404,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         ],
                       ),
 
-                      // Horizontal measurement cards
-                      SizedBox(
-                        height: 120,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            measurementCard(
-                              title: "Chest",
-                              value:
-                                  "${_getLatestMeasurement('chest')?.toStringAsFixed(1) ?? '--'} cm",
-                              progress: _formatChange(
-                                  _getLatestMeasurement('chest'),
-                                  _getPreviousMeasurement('chest')),
-                              isPositive:
-                                  (_getLatestMeasurement('chest') ?? 0) >=
-                                      (_getPreviousMeasurement('chest') ?? 0),
-                            ),
-                            measurementCard(
-                              title: "Waist",
-                              value:
-                                  "${_getLatestMeasurement('waist')?.toStringAsFixed(1) ?? '--'} cm",
-                              progress: _formatChange(
-                                  _getLatestMeasurement('waist'),
-                                  _getPreviousMeasurement('waist')),
-                              isPositive:
-                                  (_getLatestMeasurement('waist') ?? 0) <=
-                                      (_getPreviousMeasurement('waist') ?? 0),
-                            ),
-                            measurementCard(
-                              title: "Arms",
-                              value:
-                                  "${_getLatestMeasurement('arms')?.toStringAsFixed(1) ?? '--'} cm",
-                              progress: _formatChange(
-                                  _getLatestMeasurement('arms'),
-                                  _getPreviousMeasurement('arms')),
-                              isPositive:
-                                  (_getLatestMeasurement('arms') ?? 0) >=
-                                      (_getPreviousMeasurement('arms') ?? 0),
-                            ),
-                            measurementCard(
-                              title: "Thighs",
-                              value:
-                                  "${_getLatestMeasurement('thighs')?.toStringAsFixed(1) ?? '--'} cm",
-                              progress: _formatChange(
-                                  _getLatestMeasurement('thighs'),
-                                  _getPreviousMeasurement('thighs')),
-                              isPositive:
-                                  (_getLatestMeasurement('thighs') ?? 0) >=
-                                      (_getPreviousMeasurement('thighs') ?? 0),
-                            ),
-                          ],
-                        ),
-                      ),
-
                       SizedBox(height: 20),
 
                       // Chart Section
                       Container(
                         padding: const EdgeInsets.all(15),
                         decoration: BoxDecoration(
-                          color: TColor.lightGray,
+                          color: TColor.lightGrayColor(context),
                           borderRadius: BorderRadius.circular(15),
                         ),
                         child: Column(
@@ -391,16 +423,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
                                   padding: EdgeInsets.symmetric(
                                       horizontal: 15, vertical: 5),
                                   decoration: BoxDecoration(
-                                    color: TColor.white,
+                                    color: TColor.whiteColor(context),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                        color: TColor.gray.withOpacity(0.3)),
+                                        color: TColor.grayColor(context)
+                                            .withOpacity(0.3)),
                                   ),
                                   child: DropdownButton<String>(
                                     value: selectedMetric,
                                     icon: Icon(
                                       Icons.keyboard_arrow_down,
-                                      color: TColor.gray,
+                                      color: TColor.grayColor(context),
                                     ),
                                     underline: SizedBox(),
                                     items: metrics.map((String value) {
@@ -409,7 +442,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                                         child: Text(
                                           value,
                                           style: TextStyle(
-                                            color: TColor.black,
+                                            color: TColor.textColor(context),
                                             fontSize: 14,
                                           ),
                                         ),
@@ -430,16 +463,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
                                   padding: EdgeInsets.symmetric(
                                       horizontal: 15, vertical: 5),
                                   decoration: BoxDecoration(
-                                    color: TColor.white,
+                                    color: TColor.whiteColor(context),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                        color: TColor.gray.withOpacity(0.3)),
+                                        color: TColor.grayColor(context)
+                                            .withOpacity(0.3)),
                                   ),
                                   child: DropdownButton<String>(
                                     value: selectedRange,
                                     icon: Icon(
                                       Icons.keyboard_arrow_down,
-                                      color: TColor.gray,
+                                      color: TColor.grayColor(context),
                                     ),
                                     underline: SizedBox(),
                                     items: timeRanges.map((String value) {
@@ -448,7 +482,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                                         child: Text(
                                           value,
                                           style: TextStyle(
-                                            color: TColor.black,
+                                            color: TColor.textColor(context),
                                             fontSize: 14,
                                           ),
                                         ),
@@ -480,7 +514,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
                                     horizontalInterval: 1,
                                     getDrawingHorizontalLine: (value) {
                                       return FlLine(
-                                        color: TColor.gray.withOpacity(0.15),
+                                        color: TColor.grayColor(context)
+                                            .withOpacity(0.15),
                                         strokeWidth: 1,
                                       );
                                     },
@@ -489,7 +524,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
                                     leftTitles: AxisTitles(
                                       sideTitles: SideTitles(
                                         showTitles: true,
-                                        getTitlesWidget: leftTitleWidgets,
+                                        getTitlesWidget: (value, meta) =>
+                                            leftTitleWidgets(
+                                                value, meta, context),
                                         reservedSize: 40,
                                       ),
                                     ),
@@ -502,7 +539,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
                                     bottomTitles: AxisTitles(
                                       sideTitles: SideTitles(
                                         showTitles: true,
-                                        getTitlesWidget: bottomTitleWidgets,
+                                        getTitlesWidget: (value, meta) =>
+                                            bottomTitleWidgets(
+                                                value, meta, context),
                                         reservedSize: 30,
                                       ),
                                     ),
@@ -523,7 +562,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
                                             radius: 4,
                                             color: TColor.primaryColor1,
                                             strokeWidth: 2,
-                                            strokeColor: TColor.white,
+                                            strokeColor:
+                                                TColor.whiteColor(context),
                                           );
                                         },
                                       ),
@@ -538,7 +578,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
                                     touchTooltipData: LineTouchTooltipData(
                                       getTooltipColor:
                                           (LineBarSpot touchedSpot) =>
-                                              TColor.black.withOpacity(0.8),
+                                              TColor.textColor(context)
+                                                  .withOpacity(0.8),
                                       getTooltipItems:
                                           (List<LineBarSpot> touchedBarSpots) {
                                         return touchedBarSpots.map((barSpot) {
@@ -549,7 +590,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                                           return LineTooltipItem(
                                             '${barSpot.y.toStringAsFixed(1)} $unit',
                                             TextStyle(
-                                              color: TColor.white,
+                                              color: TColor.whiteColor(context),
                                               fontWeight: FontWeight.bold,
                                             ),
                                           );
@@ -565,71 +606,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       ),
 
                       SizedBox(height: 20),
-
-                      // Achievements Section
-                      Text(
-                        "Achievement Badges",
-                        style: TextStyle(
-                          color: TColor.black,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-
-                      SizedBox(height: 15),
-
-                      // Achievement badges grid
-                      GridView.count(
-                        crossAxisCount: 4,
-                        crossAxisSpacing: 15,
-                        mainAxisSpacing: 15,
-                        shrinkWrap: true,
-                        physics: NeverScrollableScrollPhysics(),
-                        children: [
-                          achievementBadge(
-                            icon: Icons.emoji_events,
-                            title: "10K Steps",
-                            isUnlocked: true,
-                          ),
-                          achievementBadge(
-                            icon: Icons.calendar_month,
-                            title: "7 Day Streak",
-                            isUnlocked: true,
-                          ),
-                          achievementBadge(
-                            icon: Icons.fitness_center,
-                            title: "First Workout",
-                            isUnlocked: true,
-                          ),
-                          achievementBadge(
-                            icon: Icons.speed,
-                            title: "Goal Crusher",
-                            isUnlocked: true,
-                          ),
-                          achievementBadge(
-                            icon: Icons.local_fire_department,
-                            title: "Calorie Master",
-                            isUnlocked: false,
-                          ),
-                          achievementBadge(
-                            icon: Icons.run_circle_outlined,
-                            title: "Marathon",
-                            isUnlocked: false,
-                          ),
-                          achievementBadge(
-                            icon: Icons.timer,
-                            title: "Early Bird",
-                            isUnlocked: false,
-                          ),
-                          achievementBadge(
-                            icon: Icons.star,
-                            title: "30 Day Pro",
-                            isUnlocked: false,
-                          ),
-                        ],
-                      ),
-
-                      SizedBox(height: 20),
                     ],
                   ),
                 ),
@@ -642,23 +618,22 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Future<bool?> _showAddMeasurementDialog() async {
     final weightController = TextEditingController();
     final heightController = TextEditingController();
-    final chestController = TextEditingController();
+    final neckController = TextEditingController();
     final waistController = TextEditingController();
-    final armsController = TextEditingController();
-    final thighsController = TextEditingController();
-    final bodyFatController = TextEditingController();
+    final hipController = TextEditingController();
+    final ageController = TextEditingController();
 
     // Pre-fill with latest measurements if available
     if (_measurements.isNotEmpty) {
       weightController.text = _getLatestMeasurement('weight')?.toString() ?? '';
       heightController.text = _getLatestMeasurement('height')?.toString() ?? '';
-      chestController.text = _getLatestMeasurement('chest')?.toString() ?? '';
       waistController.text = _getLatestMeasurement('waist')?.toString() ?? '';
-      armsController.text = _getLatestMeasurement('arms')?.toString() ?? '';
-      thighsController.text = _getLatestMeasurement('thighs')?.toString() ?? '';
-      bodyFatController.text =
-          _getLatestMeasurement('body_fat_percentage')?.toString() ?? '';
+      neckController.text = _getLatestMeasurement('neck')?.toString() ?? '';
+      hipController.text = _getLatestMeasurement('hip')?.toString() ?? '';
     }
+
+    // Age will be used for body fat calculation when waist is not provided
+    ageController.text = '30'; // Default age
 
     return showDialog<bool>(
       context: context,
@@ -685,13 +660,21 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   hintText: "Enter your height",
                 ),
               ),
+              SizedBox(height: 15),
+              Text(
+                "For accurate body fat calculation (optional):",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
               SizedBox(height: 10),
               TextField(
-                controller: chestController,
+                controller: neckController,
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
-                  labelText: "Chest (cm)",
-                  hintText: "Enter chest measurement",
+                  labelText: "Neck (cm)",
+                  hintText: "Circumference at narrowest point",
                 ),
               ),
               SizedBox(height: 10),
@@ -700,34 +683,29 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   labelText: "Waist (cm)",
-                  hintText: "Enter waist measurement",
+                  hintText: "Circumference at navel",
+                ),
+              ),
+              if (_userGender.toLowerCase() == 'female')
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: TextField(
+                    controller: hipController,
+                    keyboardType:
+                        TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                      labelText: "Hip (cm)",
+                      hintText: "Circumference at widest point",
+                    ),
                 ),
               ),
               SizedBox(height: 10),
               TextField(
-                controller: armsController,
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                controller: ageController,
+                keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText: "Arms (cm)",
-                  hintText: "Enter arms measurement",
-                ),
-              ),
-              SizedBox(height: 10),
-              TextField(
-                controller: thighsController,
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: "Thighs (cm)",
-                  hintText: "Enter thighs measurement",
-                ),
-              ),
-              SizedBox(height: 10),
-              TextField(
-                controller: bodyFatController,
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: "Body Fat (%)",
-                  hintText: "Enter body fat percentage",
+                  labelText: "Age (years)",
+                  hintText: "Used for body fat calculation",
                 ),
               ),
             ],
@@ -753,21 +731,18 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   height: heightController.text.isNotEmpty
                       ? double.parse(heightController.text)
                       : null,
-                  chest: chestController.text.isNotEmpty
-                      ? double.parse(chestController.text)
-                      : null,
                   waist: waistController.text.isNotEmpty
                       ? double.parse(waistController.text)
                       : null,
-                  arms: armsController.text.isNotEmpty
-                      ? double.parse(armsController.text)
+                  neck: neckController.text.isNotEmpty
+                      ? double.parse(neckController.text)
                       : null,
-                  thighs: thighsController.text.isNotEmpty
-                      ? double.parse(thighsController.text)
+                  hip: hipController.text.isNotEmpty
+                      ? double.parse(hipController.text)
                       : null,
-                  bodyFatPercentage: bodyFatController.text.isNotEmpty
-                      ? double.parse(bodyFatController.text)
-                      : null,
+                  age: ageController.text.isNotEmpty
+                      ? int.parse(ageController.text)
+                      : 30,
                 );
 
                 Navigator.pop(context, true);
@@ -857,124 +832,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  // Measurement Card Widget
-  Widget measurementCard({
-    required String title,
-    required String value,
-    required String progress,
-    required bool isPositive,
-  }) {
-    return Container(
-      width: 120,
-      margin: EdgeInsets.only(right: 15),
-      padding: EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: TColor.lightGray,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: TColor.gray,
-              fontSize: 13,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: TColor.black,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          SizedBox(height: 8),
-          progress.isEmpty
-              ? SizedBox()
-              : Row(
-                  children: [
-                    Icon(
-                      isPositive ? Icons.arrow_drop_up : Icons.arrow_drop_down,
-                      color: isPositive
-                          ? (title == "Waist" || title == "Thighs"
-                              ? TColor.primaryColor1
-                              : TColor.secondaryColor1)
-                          : TColor.gray,
-                      size: 18,
-                    ),
-                    Text(
-                      progress,
-                      style: TextStyle(
-                        color: isPositive
-                            ? (title == "Waist" || title == "Thighs"
-                                ? TColor.primaryColor1
-                                : TColor.secondaryColor1)
-                            : TColor.gray,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-        ],
-      ),
-    );
-  }
-
-  // Achievement Badge Widget
-  Widget achievementBadge({
-    required IconData icon,
-    required String title,
-    required bool isUnlocked,
-  }) {
-    return Column(
-      children: [
-        Container(
-          height: 60,
-          width: 60,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: isUnlocked
-                ? LinearGradient(
-                    colors: title.contains("Day") || title.contains("Step")
-                        ? TColor.primaryG
-                        : TColor.secondaryG,
-                  )
-                : null,
-            color: isUnlocked ? null : TColor.lightGray,
-          ),
-          alignment: Alignment.center,
-          child: Icon(
-            icon,
-            color: isUnlocked ? TColor.white : TColor.gray,
-            size: 28,
-          ),
-        ),
-        SizedBox(height: 8),
-        Text(
-          title,
-          style: TextStyle(
-            color: isUnlocked ? TColor.black : TColor.gray,
-            fontSize: 12,
-            fontWeight: isUnlocked ? FontWeight.w600 : FontWeight.normal,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
   // Chart Title Widgets
-  Widget leftTitleWidgets(double value, TitleMeta meta) {
+  Widget leftTitleWidgets(double value, TitleMeta meta, BuildContext context) {
     String unit = selectedMetric == "Weight" ? "kg" : "%";
     return Text(
       '${value.toInt()} $unit',
       style: TextStyle(
-        color: TColor.gray,
+        color: TColor.grayColor(context),
         fontSize: 10,
         fontWeight: FontWeight.w500,
       ),
@@ -982,9 +846,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget bottomTitleWidgets(double value, TitleMeta meta) {
-    const style = TextStyle(
-      color: Colors.grey,
+  Widget bottomTitleWidgets(
+      double value, TitleMeta meta, BuildContext context) {
+    final style = TextStyle(
+      color: TColor.grayColor(context),
       fontSize: 10,
       fontWeight: FontWeight.w500,
     );
