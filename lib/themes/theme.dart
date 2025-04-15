@@ -31,4 +31,44 @@ class AppTheme {
       ),
     ),
   );
+
+  static ThemeData darkTheme = ThemeData(
+    primaryColor: TColor.primaryColor1, // Keep the same primary colors
+    colorScheme: ColorScheme.dark(
+      primary: TColor.primaryColor1,
+      secondary: TColor.secondaryColor1,
+      background: const Color(0xff121212),
+      surface: const Color(0xff2A2A2A),
+      onPrimary: Colors.white,
+      onSecondary: Colors.white,
+      onBackground: Colors.white,
+      onSurface: Colors.white,
+    ),
+    textTheme: GoogleFonts.poppinsTextTheme().apply(
+      bodyColor: Colors.white, // Light text for dark theme
+      displayColor: Colors.white,
+    ),
+    scaffoldBackgroundColor: const Color(0xff121212), // Dark background
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: TColor.primaryColor1, // Keep primary color for buttons
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+      ),
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: const Color(0xff121212),
+      foregroundColor: Colors.white,
+      elevation: 0,
+    ),
+    cardTheme: CardTheme(
+      color: const Color(0xff2A2A2A),
+    ),
+    iconTheme: IconThemeData(
+      color: TColor.primaryColor1,
+    ),
+  );
 }
