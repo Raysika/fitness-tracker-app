@@ -148,8 +148,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                     lastDate: DateTime.now(),
                   );
                   if (pickedDate != null) {
+                    // Format date as YYYY-MM-DD for PostgreSQL compatibility
                     _dobController.text =
-                        "${pickedDate.day}/${pickedDate.month}/${pickedDate.year}";
+                        "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
                   }
                 },
                 validator: (value) {

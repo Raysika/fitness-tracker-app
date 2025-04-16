@@ -52,6 +52,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Future<void> _loadWorkouts() async {
     try {
+      if (!mounted) return; // Early return if widget is no longer mounted
+
       setState(() {
         _isLoading = true;
       });
@@ -59,22 +61,31 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       final workoutType = selectedTabIndex == 0 ? null : tabs[selectedTabIndex];
       final workouts = await _supabaseService.getWorkoutsByType(workoutType);
 
+      if (!mounted) return; // Check again after async operation
+
       setState(() {
         _workouts = workouts;
         _isLoading = false;
       });
     } catch (e) {
       print('Error loading workouts: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   Future<void> _loadRecommendations() async {
     try {
+      if (!mounted) return; // Early return if widget is no longer mounted
+
       final recommendations =
           await _supabaseService.getWorkoutRecommendations();
+
+      if (!mounted) return; // Check again after async operation
+
       setState(() {
         _recommendations = recommendations;
       });
@@ -85,11 +96,15 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Future<void> _searchWorkouts(String query) async {
     try {
+      if (!mounted) return; // Early return if widget is no longer mounted
+
       setState(() {
         _isLoading = true;
       });
 
       final results = await _supabaseService.searchWorkouts(query);
+
+      if (!mounted) return; // Check again after async operation
 
       setState(() {
         _workouts = results;
@@ -97,19 +112,24 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       });
     } catch (e) {
       print('Error searching workouts: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  void _onTabChange(int index) {
+  Future<void> _onTabChange(int index) async {
+    if (!mounted) return;
+
     setState(() {
       selectedTabIndex = index;
       _isSearching = false;
       _searchController.clear();
     });
-    _loadWorkouts();
+
+    await _loadWorkouts();
   }
 
   void _navigateToWorkoutDetail(String workoutType) {
@@ -134,14 +154,17 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
   }
 
-  void _toggleSearch() {
+  Future<void> _toggleSearch() async {
+    if (!mounted) return;
+
     setState(() {
       _isSearching = !_isSearching;
-      if (!_isSearching) {
-        _searchController.clear();
-        _loadWorkouts();
-      }
     });
+
+    if (!_isSearching) {
+      _searchController.clear();
+      await _loadWorkouts();
+    }
   }
 
   @override
@@ -165,7 +188,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: _toggleSearch,
+                    onTap: () async {
+                      await _toggleSearch();
+                    },
                     child: Container(
                       height: 40,
                       width: 40,
@@ -212,11 +237,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                     }
                   },
                   onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                    if (value.isEmpty) {
-                      _loadWorkouts();
+                    if (mounted) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                      if (value.isEmpty) {
+                        _loadWorkouts();
+                      }
                     }
                   },
                 ),
@@ -234,7 +261,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 10),
                     child: GestureDetector(
-                      onTap: () => _onTabChange(index),
+                      onTap: () async {
+                        await _onTabChange(index);
+                      },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         decoration: BoxDecoration(

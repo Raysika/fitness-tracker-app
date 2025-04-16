@@ -36,6 +36,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadUserData() async {
     final profile = await _supabaseService.getUserProfile();
     if (profile != null) {
+      print('Profile data loaded: ${profile.toString()}');
+      print('Profile image URL from database: ${profile['profile_image_url']}');
+
       setState(() {
         // Convert numeric values to proper types
         double? height = profile['height'] != null
@@ -66,6 +69,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'joinDate': 'Joined ${_formatDate(profile['created_at'])}',
         };
         _profileImageUrl = profile['profile_image_url'];
+        print('Setting profile image URL to: $_profileImageUrl');
         _isLoading = false;
       });
     }
@@ -101,12 +105,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       try {
         final imageUrl =
             await _supabaseService.uploadProfileImage(_selectedImage!);
+        print('Image uploaded successfully, URL returned: $imageUrl');
+
         if (imageUrl != null) {
+          // Reload user data to ensure we have latest profile information
+          await _loadUserData();
+
+          // Also set the URL directly in case _loadUserData doesn't update it
           setState(() {
             _profileImageUrl = imageUrl;
+            print('Updated profile image URL to: $_profileImageUrl');
           });
         }
       } catch (e) {
+        print('Error in _pickAndUploadImage: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error uploading image: $e')),
         );
@@ -147,34 +159,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           GestureDetector(
                             onTap: _pickAndUploadImage,
                             child: Stack(
-                        children: [
-                          Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: TColor.primaryColor1,
-                                width: 2,
-                              ),
-                            ),
-                            child: ClipOval(
+                              children: [
+                                Container(
+                                  width: 120,
+                                  height: 120,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: TColor.primaryColor1,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: ClipOval(
                                     child: _profileImageUrl != null
                                         ? Image.network(
                                             _profileImageUrl!,
                                             fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                              return Image.asset(
-                                                'assets/images/profile_placeholder.jpg',
-                                                fit: BoxFit.cover,
+                                            loadingBuilder: (context, child,
+                                                loadingProgress) {
+                                              if (loadingProgress == null)
+                                                return child;
+                                              return Center(
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  value: loadingProgress
+                                                              .expectedTotalBytes !=
+                                                          null
+                                                      ? loadingProgress
+                                                              .cumulativeBytesLoaded /
+                                                          loadingProgress
+                                                              .expectedTotalBytes!
+                                                      : null,
+                                                ),
                                               );
                                             },
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                              print(
+                                                  'Error loading profile image: $error');
+                                              // If URL has "?token=" in it, it's a signed URL and we should try stripping the token params
+                                              if (_profileImageUrl!
+                                                  .contains('?token=')) {
+                                                String baseUrl =
+                                                    _profileImageUrl!
+                                                        .split('?')[0];
+                                                print(
+                                                    'Trying fallback to base URL: $baseUrl');
+                                                return Image.network(
+                                                  baseUrl,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error,
+                                                      stackTrace) {
+                                                    return _buildInitialsAvatar();
+                                                  },
+                                                );
+                                              }
+                                              return _buildInitialsAvatar();
+                                            },
                                           )
-                                        : Image.asset(
-                                'assets/images/profile_placeholder.jpg',
-                                fit: BoxFit.cover,
-                              ),
+                                        : _buildInitialsAvatar(),
                                   ),
                                 ),
                                 Positioned(
@@ -598,7 +641,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('Edit Name'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-        children: [
+          children: [
             TextField(
               controller: firstNameController,
               decoration: const InputDecoration(labelText: 'First Name'),
@@ -755,8 +798,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'Lose Weight',
       'Build Muscle',
       'Improve Fitness',
-      'Increase Flexibility',
-      'Maintain Health'
     ];
 
     showDialog(
@@ -811,12 +852,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Close the dialog first
               Navigator.pop(dialogContext);
 
-              // Then perform the signout operation
-              await context.read<AuthProvider>().signOut();
+              // Show loading indicator
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (BuildContext context) => const Dialog(
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(width: 20),
+                        Text("Logging out..."),
+                      ],
+                    ),
+                  ),
+                ),
+              );
 
-              // Navigate to login screen after signout is complete
-              // Use the saved router instead of context.go
-              router.go(AppRoutes.login);
+              try {
+                // Save theme mode before clearing preferences
+                final prefs = await SharedPreferences.getInstance();
+                final isDarkMode = prefs.getBool('theme_mode') ?? false;
+
+                // Clear SharedPreferences
+                await prefs.clear();
+
+                // Restore theme mode preference only
+                await prefs.setBool('theme_mode', isDarkMode);
+
+                // Set onboarding as completed to avoid redirecting there
+                await prefs.setBool('onboarding_complete', true);
+
+                // Then perform the signout operation
+                await context.read<AuthProvider>().signOut();
+              } catch (e) {
+                print("Error during logout: $e");
+              } finally {
+                // Navigate to login screen after signout is complete
+                // Use the saved router instead of context.go
+                router.go(AppRoutes.login);
+              }
             },
             child: const Text(
               "Logout",
@@ -824,6 +901,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildInitialsAvatar() {
+    final initials = userData['name']
+        .split(' ')
+        .map((word) => word[0].toUpperCase())
+        .take(2)
+        .join('');
+    return Container(
+      width: 120,
+      height: 120,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: TColor.primaryColor1,
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(
+            color: TColor.white,
+            fontSize: 48,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }

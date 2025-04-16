@@ -5,9 +5,22 @@ import 'dart:io';
 import 'package:path/path.dart' as path;
 import './body_fat_calculator.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SupabaseService {
   final supabase = Supabase.instance.client;
+
+  // Shared Preferences keys
+  static const String _calorieGoalKey = 'calorie_goal';
+  static const String _workoutMinuteGoalKey = 'workout_minute_goal';
+
+  // Shared preferences keys for remember me feature
+  static const String rememberMeKey = 'remember_me';
+  static const String savedEmailKey = 'saved_email';
+
+  // Default values
+  static const int defaultCalorieGoal = 1200;
+  static const int defaultWorkoutMinuteGoal = 60;
 
   // Authentication Methods
   Future<void> signUp(
@@ -37,7 +50,32 @@ class SupabaseService {
   }
 
   Future<void> signOut() async {
+    // Get Remember Me data using our helper method
+    final rememberMeData = await getRememberMeData();
+    final rememberMe = rememberMeData['rememberMe'];
+    final savedEmail = rememberMeData['email'];
+
+    print(
+        'Sign out - Remember me setting: $rememberMe, Saved email: $savedEmail');
+
+    // If remember me is off, clear saved email
+    if (!rememberMe) {
+      await setRememberMe(false, '');
+      print('Cleared saved email on sign out');
+    } else {
+      print('Keeping saved email for next login: $savedEmail');
+    }
+
+    // Sign out from Supabase
     await supabase.auth.signOut();
+  }
+
+  // Password Reset Method
+  Future<void> resetPassword(String email) async {
+    await supabase.auth.resetPasswordForEmail(
+      email,
+      redirectTo: 'io.supabase.flutterquickstart://reset-callback/',
+    );
   }
 
   // User Profile Methods
@@ -65,6 +103,8 @@ class SupabaseService {
     String? profileImageUrl,
     int? stepGoal,
     int? waterGoal,
+    int? calorieGoal,
+    int? workoutMinuteGoal,
   }) async {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
@@ -84,6 +124,22 @@ class SupabaseService {
     if (stepGoal != null) updates['step_goal'] = stepGoal;
     if (waterGoal != null) updates['water_goal'] = waterGoal;
 
+    // Save calorie goal and workout minute goal to SharedPreferences
+    if (calorieGoal != null || workoutMinuteGoal != null) {
+      final prefs = await SharedPreferences.getInstance();
+
+      if (calorieGoal != null) {
+        await prefs.setInt(_calorieGoalKey, calorieGoal);
+        print('Calorie goal set to $calorieGoal (saved to SharedPreferences)');
+      }
+
+      if (workoutMinuteGoal != null) {
+        await prefs.setInt(_workoutMinuteGoalKey, workoutMinuteGoal);
+        print(
+            'Workout minute goal set to $workoutMinuteGoal (saved to SharedPreferences)');
+      }
+    }
+
     await supabase.from('user_profiles').update(updates).eq('id', userId);
   }
 
@@ -97,23 +153,54 @@ class SupabaseService {
       final fileName = 'profile_$userId$fileExt';
       final filePath = 'profiles/$fileName';
 
+      print('Attempting to upload file to: $filePath');
+      print('User ID: $userId');
+      print('File extension: $fileExt');
+
       // Upload the file to storage
-      await supabase.storage.from('user_images').upload(
+      await supabase.storage.from('user-images').upload(
             filePath,
             imageFile,
             fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
           );
 
-      // Get the public URL
-      final imageUrlResponse =
-          supabase.storage.from('user_images').getPublicUrl(filePath);
+      print('Upload successful!');
 
-      // Update the user profile with the new image URL
+      // Try getting a signed URL with direct access
+      try {
+        final signedUrl =
+            await supabase.storage.from('user-images').createSignedUrl(
+                  filePath,
+                  60 * 60 * 24 * 365, // 1 year expiry
+                );
+
+        print('Created signed URL: $signedUrl');
+
+        // Update the user profile with the signed URL
+        await updateUserProfile(profileImageUrl: signedUrl);
+
+        return signedUrl;
+      } catch (e) {
+        print('Error creating signed URL: $e');
+        // Fall back to public URL if signed URL fails
+      }
+
+      // Get the public URL as fallback
+      final imageUrlResponse =
+          supabase.storage.from('user-images').getPublicUrl(filePath);
+
+      print('Fallback public URL: $imageUrlResponse');
+
+      // Update the user profile with the public URL
       await updateUserProfile(profileImageUrl: imageUrlResponse);
 
       return imageUrlResponse;
     } catch (error) {
       print('Error uploading profile image: $error');
+      if (error is StorageException) {
+        print(
+            'Storage error details: ${error.message}, status: ${error.statusCode}');
+      }
       return null;
     }
   }
@@ -280,18 +367,95 @@ class SupabaseService {
 
   // Get workout video URL
   Future<String?> getWorkoutVideoUrl(String workoutType) async {
-    // Since we're not storing actual videos in database, we'll return YouTube URLs based on workout type
-    // In a real application, these would be fetched from the database
-    Map<String, String> workoutVideos = {
-      'Fullbody': 'https://www.youtube.com/watch?v=UBMk30rjy0o',
-      'Upper': 'https://www.youtube.com/watch?v=EZGqGJZkuHE',
-      'Lower': 'https://www.youtube.com/watch?v=sJGP8SEBgO0',
-      'Abs': 'https://www.youtube.com/watch?v=8AAmaSOSyIA',
-      'Core': 'https://www.youtube.com/watch?v=aP03n2ZqfaU',
-      'Cardio': 'https://www.youtube.com/watch?v=ml6cT4AZdqI',
+    try {
+      print('Getting workout video for type: $workoutType');
+      final data = await supabase
+          .from('workout_videos')
+          .select('video_url')
+          .eq('workout_type', workoutType)
+          .limit(1)
+          .single();
+
+      final videoUrl = data['video_url'] as String?;
+      print('Video URL from database: $videoUrl');
+
+      if (videoUrl != null && videoUrl.isNotEmpty) {
+        // Make sure it's a valid YouTube URL and format it properly
+        final formattedUrl = _ensureValidYoutubeUrl(videoUrl);
+        print('Formatted video URL: $formattedUrl');
+        return formattedUrl;
+      }
+
+      print('No video URL found in database for: $workoutType');
+      return _getFallbackVideoUrl(workoutType);
+    } catch (e) {
+      print('Error getting workout video URL from database: $e');
+      // Fallback to hardcoded videos if database query fails
+      return _getFallbackVideoUrl(workoutType);
+    }
+  }
+
+  // Get fallback video URL
+  String _getFallbackVideoUrl(String workoutType) {
+    print('Using fallback video for: $workoutType');
+    // These are verified working YouTube video IDs
+    Map<String, String> fallbackVideoIds = {
+      'Fullbody': 'UBMk30rjy0o',
+      'Upper': 'aP03n2ZqfaU',
+      'Lower': 'kwkXyHjgoDM',
+      'Abs': '8AAmaSOSyIA',
+      'Core': 'DHD1-2PKufg',
+      'Cardio': 'ml6cT4AZdqI',
     };
 
-    return workoutVideos[workoutType] ?? workoutVideos['Fullbody'];
+    final videoId =
+        fallbackVideoIds[workoutType] ?? fallbackVideoIds['Fullbody']!;
+    final url = 'https://www.youtube.com/watch?v=$videoId';
+    print('Fallback video URL: $url');
+    return url;
+  }
+
+  // Helper method to ensure YouTube URLs are properly formatted
+  String _ensureValidYoutubeUrl(String url) {
+    if (url.isEmpty) {
+      print('Empty URL provided to _ensureValidYoutubeUrl');
+      return 'https://www.youtube.com/watch?v=UBMk30rjy0o'; // Default fallback
+    }
+
+    // Handle youtu.be format
+    if (url.contains('youtu.be/')) {
+      final parts = url.split('youtu.be/');
+      if (parts.length > 1) {
+        final videoId = parts[1].split('?')[0].split('&')[0];
+        print('Extracted video ID from youtu.be URL: $videoId');
+        return 'https://www.youtube.com/watch?v=$videoId';
+      }
+    }
+
+    // Handle embed format
+    if (url.contains('youtube.com/embed/')) {
+      final parts = url.split('youtube.com/embed/');
+      if (parts.length > 1) {
+        final videoId = parts[1].split('?')[0].split('&')[0];
+        print('Extracted video ID from embed URL: $videoId');
+        return 'https://www.youtube.com/watch?v=$videoId';
+      }
+    }
+
+    // Handle normal YouTube URLs
+    if (url.contains('youtube.com/watch')) {
+      // Extract v parameter
+      final uri = Uri.parse(url);
+      final videoId = uri.queryParameters['v'];
+      if (videoId != null && videoId.isNotEmpty) {
+        print('Extracted video ID from watch URL: $videoId');
+        return 'https://www.youtube.com/watch?v=$videoId';
+      }
+    }
+
+    print('URL format not recognized, using as is: $url');
+    // Already in proper format or unrecognized
+    return url;
   }
 
   // Get workout details by type
@@ -511,6 +675,45 @@ class SupabaseService {
     return data?['steps'] as int?;
   }
 
+  // Efficient batch method to get step data for a date range
+  Future<List<Map<String, dynamic>>> getStepDataRange(
+      String startDate, String endDate) async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+
+    try {
+      // Query all step data within the date range in a single request
+      final data = await supabase
+          .from('step_tracking')
+          .select('date, steps')
+          .eq('user_id', userId)
+          .gte('date', startDate) // Greater than or equal to start date
+          .lte('date', endDate) // Less than or equal to end date
+          .order('date', ascending: false);
+
+      if (data == null) return [];
+
+      // Convert to the required format
+      List<Map<String, dynamic>> result = [];
+      for (var item in data) {
+        final steps = item['steps'] as int? ?? 0;
+        // Estimate calories based on steps (simple calculation)
+        final calories = (steps * 0.04).round();
+
+        result.add({
+          'date': item['date'],
+          'steps': steps,
+          'calories': calories,
+        });
+      }
+
+      return result;
+    } catch (e) {
+      print('Error fetching step data range: $e');
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>> getDailyActivitySummary() async {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) {
@@ -518,9 +721,9 @@ class SupabaseService {
         'steps': 0,
         'step_goal': 10000,
         'calories': 0,
-        'calorie_goal': 1200,
+        'calorie_goal': defaultCalorieGoal,
         'workout_minutes': 0,
-        'workout_minute_goal': 60,
+        'workout_minute_goal': defaultWorkoutMinuteGoal,
         'water_intake': 0,
         'water_goal': 4000, // 4 liters in ml
       };
@@ -537,6 +740,12 @@ class SupabaseService {
     final stepGoal = profile?['step_goal'] ?? 10000;
     final waterGoal = profile?['water_goal'] ?? 4000; // 4 liters in ml
 
+    // Get goals from SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    final calorieGoal = prefs.getInt(_calorieGoalKey) ?? defaultCalorieGoal;
+    final workoutMinuteGoal =
+        prefs.getInt(_workoutMinuteGoalKey) ?? defaultWorkoutMinuteGoal;
+
     // Calculate estimated calories based on steps (very simple estimation)
     // In a real app, this would be much more sophisticated
     final estimatedCalories = (steps * 0.04).round();
@@ -551,9 +760,9 @@ class SupabaseService {
       'steps': steps,
       'step_goal': stepGoal,
       'calories': estimatedCalories,
-      'calorie_goal': 1200, // Default goal
+      'calorie_goal': calorieGoal,
       'workout_minutes': workoutMinutes,
-      'workout_minute_goal': 60, // Default goal
+      'workout_minute_goal': workoutMinuteGoal,
       'water_intake': waterIntake,
       'water_goal': waterGoal,
     };
@@ -632,5 +841,50 @@ class SupabaseService {
     }
 
     return total;
+  }
+
+  // Helper methods for goal management
+  Future<int> getCalorieGoal() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_calorieGoalKey) ?? defaultCalorieGoal;
+  }
+
+  Future<void> setCalorieGoal(int goal) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_calorieGoalKey, goal);
+  }
+
+  Future<int> getWorkoutMinuteGoal() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_workoutMinuteGoalKey) ?? defaultWorkoutMinuteGoal;
+  }
+
+  Future<void> setWorkoutMinuteGoal(int goal) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_workoutMinuteGoalKey, goal);
+  }
+
+  // Helper methods for remember me functionality
+  Future<void> setRememberMe(bool value, String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(rememberMeKey, value);
+    if (value && email.isNotEmpty) {
+      await prefs.setString(savedEmailKey, email);
+      print('SupabaseService: Set remember me=$value, email=$email');
+    } else {
+      await prefs.remove(savedEmailKey);
+      print('SupabaseService: Cleared remember me data');
+    }
+  }
+
+  Future<Map<String, dynamic>> getRememberMeData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberMe = prefs.getBool(rememberMeKey) ?? false;
+    final email = prefs.getString(savedEmailKey) ?? '';
+    print('SupabaseService: Got remember me=$rememberMe, email=$email');
+    return {
+      'rememberMe': rememberMe,
+      'email': email,
+    };
   }
 }

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../common/color_extension.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/tab_controller_provider.dart';
 
 class MainTabView extends StatefulWidget {
   final Map<String, dynamic>? extra;
@@ -17,16 +18,20 @@ class MainTabView extends StatefulWidget {
 }
 
 class _MainTabViewState extends State<MainTabView> {
-  late int _selectedIndex;
-
   @override
   void initState() {
     super.initState();
     // Check if we should navigate to a specific tab from extra data
     if (widget.extra != null && widget.extra!.containsKey('tabIndex')) {
-      _selectedIndex = widget.extra!['tabIndex'] as int;
-    } else {
-      _selectedIndex = 0;
+      final tabIndex = widget.extra!['tabIndex'] as int;
+      // Set the tab index in the provider after a small delay to ensure the widget is mounted
+      Future.delayed(Duration.zero, () {
+        if (mounted) {
+          final tabProvider =
+              Provider.of<TabControllerProvider>(context, listen: false);
+          tabProvider.changeTab(tabIndex);
+        }
+      });
     }
   }
 
@@ -38,19 +43,14 @@ class _MainTabViewState extends State<MainTabView> {
     const ProfileScreen(),
   ];
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final tabProvider = Provider.of<TabControllerProvider>(context);
 
     return Scaffold(
       body: Center(
-        child: _widgetOptions.elementAt(_selectedIndex),
+        child: _widgetOptions.elementAt(tabProvider.currentIndex),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: <BottomNavigationBarItem>[
@@ -75,14 +75,16 @@ class _MainTabViewState extends State<MainTabView> {
             label: 'Profile',
           ),
         ],
-        currentIndex: _selectedIndex,
+        currentIndex: tabProvider.currentIndex,
         selectedItemColor: TColor.primaryColor1,
         unselectedItemColor: TColor.grayColor(context),
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
         backgroundColor: TColor.whiteColor(context),
         elevation: 15,
-        onTap: _onItemTapped,
+        onTap: (index) {
+          tabProvider.changeTab(index);
+        },
       ),
     );
   }

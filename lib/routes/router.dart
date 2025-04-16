@@ -26,8 +26,9 @@ final GoRouter appRouter = GoRouter(
   redirect: (context, state) async {
     final supabase = Supabase.instance.client;
     final isAuthenticated = supabase.auth.currentUser != null;
-    final hasCompletedOnboarding =
-        prefs.getBool('completed_onboarding') ?? false;
+    final hasCompletedOnboarding = prefs.getBool('onboarding_complete') ??
+        prefs.getBool('completed_onboarding') ??
+        false;
 
     // Current route
     final currentPath = state.matchedLocation;

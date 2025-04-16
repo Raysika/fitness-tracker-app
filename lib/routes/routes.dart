@@ -7,6 +7,7 @@ class AppRoutes {
   static const String goalSelection = '/goal-selection';
   static const String welcome = '/welcome';
   static const String home = '/home';
+  static const String workout = '/workout';
   static const String workoutDetail = '/workout-detail';
   static const String workoutHistory = '/workout-history';
   static const String allWorkouts = '/all-workouts';

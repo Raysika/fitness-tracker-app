@@ -263,36 +263,175 @@ class _WaterIntakeWidgetState extends State<WaterIntakeWidget> {
     );
   }
 
+  // Quick custom amount chips
+  Widget _buildQuickAmountChip(
+      BuildContext context, int amount, TextEditingController controller) {
+    return GestureDetector(
+      onTap: () {
+        controller.text = amount.toString();
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        margin: EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          color: TColor.primaryColor1.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: TColor.primaryColor1.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          "$amount ml",
+          style: TextStyle(
+            color: TColor.primaryColor1,
+            fontWeight: FontWeight.w500,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showAddWaterDialog(BuildContext context) {
+    // Controller for custom amount text field
+    final TextEditingController customAmountController =
+        TextEditingController();
+    int? customAmount;
+
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text(
-            "Add Water",
-            style: TextStyle(
-              color: TColor.textColor(context),
-              fontWeight: FontWeight.bold,
-            ),
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildWaterOption(context, 200, "Small Glass (200ml)"),
-              _buildWaterOption(context, 300, "Medium Glass (300ml)"),
-              _buildWaterOption(context, 500, "Large Glass (500ml)"),
-              _buildWaterOption(context, 750, "Water Bottle (750ml)"),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                "Cancel",
-                style: TextStyle(color: TColor.grayColor(context)),
+          child: Container(
+            padding: EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Add Water",
+                    style: TextStyle(
+                      color: TColor.textColor(context),
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  // Preset options
+                  _buildWaterOption(context, 200, "Small Glass (200ml)"),
+                  _buildWaterOption(context, 300, "Medium Glass (300ml)"),
+                  _buildWaterOption(context, 500, "Large Glass (500ml)"),
+                  _buildWaterOption(context, 750, "Water Bottle (750ml)"),
+
+                  // Divider between preset options and custom input
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Divider(
+                        height: 1,
+                        color: TColor.grayColor(context).withOpacity(0.3)),
+                  ),
+
+                  // Custom amount input
+                  Text(
+                    "Custom Amount",
+                    style: TextStyle(
+                      color: TColor.textColor(context),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+
+                  // Quick amount suggestions
+                  Row(
+                    children: [
+                      _buildQuickAmountChip(
+                          context, 100, customAmountController),
+                      _buildQuickAmountChip(
+                          context, 250, customAmountController),
+                      _buildQuickAmountChip(
+                          context, 400, customAmountController),
+                      _buildQuickAmountChip(
+                          context, 1000, customAmountController),
+                    ],
+                  ),
+
+                  SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: customAmountController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: "Enter amount (ml)",
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(
+                                color:
+                                    TColor.grayColor(context).withOpacity(0.3),
+                              ),
+                            ),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 15, vertical: 10),
+                            suffixText: "ml",
+                          ),
+                          onChanged: (value) {
+                            customAmount = int.tryParse(value);
+                          },
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      ElevatedButton(
+                        onPressed: () {
+                          if (customAmount != null && customAmount! > 0) {
+                            _addWater(customAmount!);
+                            Navigator.pop(context);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("Please enter a valid amount"),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: TColor.primaryColor1,
+                          padding: EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(
+                          "Add",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 15),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        "Cancel",
+                        style: TextStyle(color: TColor.grayColor(context)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         );
       },
     );
